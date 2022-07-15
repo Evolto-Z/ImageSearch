@@ -1,11 +1,10 @@
-from threading import Timer
-import PyQt6.QtCore as QtCore
+from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
 from PyQt6.QtGui import QPixmap
-from core import CorpusCollection
+from core import CorpusCollection, threadpool
 from dirManager import DirManager
 from localStorage import StorageKey, localStorage
-from misc import adaptSizeToLimitedSize, alphaBlendAntiBG
+from misc import Worker, adaptSizeToLimitedSize, alphaBlendAntiBG
 from snipper import ScreenShotWidget
 from PIL import ImageQt, Image
 import numpy as np
@@ -35,11 +34,11 @@ class ImageSearchUI(QWidget):
 
         self.label_query = QLabel()
         self.label_query.setFixedSize(CANVAS_WIDTH, CANVAS_HEIGHT)
-        self.label_query.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.label_query.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label_query.setStyleSheet("border: 1px dotted black;")
         self.label_result = QLabel()
         self.label_result.setFixedSize(CANVAS_WIDTH, CANVAS_HEIGHT)
-        self.label_result.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.label_result.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label_result.setStyleSheet("border: 1px dotted black;")
 
         btn_screenshot = QPushButton('截图')
@@ -106,17 +105,21 @@ class ImageSearchUI(QWidget):
     def onOpenDirManager(self):
         self.dirManager.show()
 
-    def onCloseDirManager(self, rootDirs):
+    def loadRootDirs(self, rootDirs):
         localStorage.save(StorageKey.RootDirs, rootDirs)
-        self.showTips('正在加载')
         for dir in rootDirs:
             self.corpusCollection.add(dir)
-        self.showTips('加载结束')
+
+    def onCloseDirManager(self, rootDirs):
+        self.showTips('正在加载...')
+        worker = Worker(self.loadRootDirs, rootDirs)
+        worker.signals.finished.connect(lambda : self.showTips('加载结束!'))
+
+        threadpool.start(worker)
         
     def onRefreshAll(self):
-        self.showTips('正在加载')
-        self.corpusCollection.refreshAll()
-        self.showTips('加载结束')
+        self.showTips('正在加载...')
+        self.corpusCollection.refreshAllAsync(lambda : self.showTips('加载结束!'))
 
     def onOpenSnipper(self):
         self.snipper.start()
@@ -126,17 +129,22 @@ class ImageSearchUI(QWidget):
 
     def onSearch(self):
         self.label_result.clear()
+        self.showTips('正在搜索...')
         if self.queryImg is not None:
-            best, bestMatches = self.corpusCollection.search(self.queryImg)
-            if best is None:
-                return
+            self.corpusCollection.searchAsync(self.queryImg, self.searchCallback)
 
-            img = cv.imread(best.path, -1)
-            img = cv.cvtColor(img, cv.COLOR_BGRA2RGBA)
-            if img.ndim == 3 and img.shape[2] == 4:
-                img = alphaBlendAntiBG(img)
-            self.showImgInLabel(img, self.label_result)
-            self.resultPath = best.path
+    def searchCallback(self, asyncRet):
+        self.showTips('搜索结束...')
+        best, bestMatches = asyncRet
+        if best is None:
+            return
+
+        img = cv.imread(best.path, -1)
+        img = cv.cvtColor(img, cv.COLOR_BGRA2RGBA)
+        if img.ndim == 3 and img.shape[2] == 4:
+            img = alphaBlendAntiBG(img)
+        self.showImgInLabel(img, self.label_result)
+        self.resultPath = best.path
 
     def showImgInLabel(self, img, label):
         pilImg = Image.fromarray(img)
@@ -145,7 +153,7 @@ class ImageSearchUI(QWidget):
 
         w, h = adaptSizeToLimitedSize(qPix.width(), qPix.height(), label.width(), label.height(), toLimit=True)
         if w != qPix.width() or h != qPix.height():
-            qPix = qPix.scaled(w, h, transformMode=QtCore.Qt.TransformationMode.SmoothTransformation)
+            qPix = qPix.scaled(w, h, transformMode=Qt.TransformationMode.SmoothTransformation)
 
         label.setPixmap(qPix)
     
@@ -153,10 +161,10 @@ class ImageSearchUI(QWidget):
         pilImg = ImageQt.fromqimage(qImg)
         self.queryImg = np.array(pilImg)
         qPix = QPixmap.fromImage(qImg)
-
+        
         w, h = adaptSizeToLimitedSize(qPix.width(), qPix.height(), label.width(), label.height(), toLimit=True)
         if w != qPix.width() or h != qPix.height():
-            qPix = qPix.scaled(w, h, transformMode=QtCore.Qt.TransformationMode.SmoothTransformation)
+            qPix = qPix.scaled(w, h, transformMode=Qt.TransformationMode.SmoothTransformation)
 
         label.setPixmap(qPix)
 

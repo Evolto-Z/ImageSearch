@@ -1,7 +1,10 @@
 import cv2 as cv
 import os
-from misc import adaptSizeToLimitedSize, alphaBlendAntiBG
+from misc import Worker, adaptSizeToLimitedSize, alphaBlendAntiBG
 import numpy as np
+from PyQt6.QtCore import *
+
+threadpool = QThreadPool()
 
 sift = cv.SIFT_create()
 FLANN_INDEX_KDTREE = 1
@@ -55,7 +58,7 @@ class Corpus:
 
         for root, dirs, files in os.walk(self.rootDir):
             for file in files:
-                if (file.endswith(('.jpg', '.png'))):
+                if file.endswith(('.jpg', '.png')):
                     path = os.path.join(root, file)
                     item = CorpusItem(path)
                     if item.isValid():
@@ -68,7 +71,7 @@ class Corpus:
         for item in self.corpus.values():
             query = (kp, des)
             train = (item.kp, item.des)
-            if (len(query[0]) > len(train[0])):
+            if len(query[0]) > len(train[0]):
                 query, train = train, query
 
             matches = flann.knnMatch(query[1], train[1], k=2)
@@ -109,6 +112,7 @@ class Corpus:
 
 class CorpusCollection:
     def __init__(self):
+        super().__init__()
         self.corpuses = {}
 
     def add(self, rootDir):
@@ -144,12 +148,30 @@ class CorpusCollection:
         
         return best, bestMatches
 
+    def searchAsync(self, img, callback):
+        worker = Worker(self.search, img)
+        worker.signals.result.connect(callback)
+
+        threadpool.start(worker)
+
     def refresh(self, rootDir):
         if rootDir in self.corpuses:
             self.corpuses[rootDir].refresh()
         else:
             self.corpuses[rootDir] = Corpus(rootDir)
+
+    def refreshAsync(self ,rootDir, callback):
+        worker = Worker(self.refresh, rootDir)
+        worker.signals.finished.connect(callback)
+
+        threadpool.start(worker)
     
     def refreshAll(self):
         for corpus in self.corpuses.values():
             corpus.refresh()
+
+    def refreshAllAsync(self, callback):
+        worker = Worker(self.refreshAll)
+        worker.signals.finished.connect(callback)
+
+        threadpool.start(worker)
