@@ -134,7 +134,7 @@ class ImageSearchUI(QWidget):
             self.corpusCollection.searchAsync(self.queryImg, self.searchCallback)
 
     def searchCallback(self, asyncRet):
-        self.showTips('搜索结束...')
+        self.showTips('搜索结束!')
         best, bestMatches = asyncRet
         if best is None:
             return
