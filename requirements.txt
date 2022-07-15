@@ -28,9 +28,9 @@ prompt-toolkit @ file:///tmp/build/80754af9/prompt-toolkit_1633440160888/work
 pure-eval @ file:///opt/conda/conda-bld/pure_eval_1646925070566/work
 Pygments @ file:///opt/conda/conda-bld/pygments_1644249106324/work
 pyparsing==3.0.9
-PyQt5==5.15.7
-PyQt5-Qt5==5.15.2
-PyQt5-sip==12.11.0
+PyQt6==6.3.1
+PyQt6-Qt6==6.3.1
+PyQt6-sip==13.4.0
 python-dateutil @ file:///tmp/build/80754af9/python-dateutil_1626374649649/work
 pywin32==302
 pyzmq @ file:///C:/ci/pyzmq_1638435185959/work
