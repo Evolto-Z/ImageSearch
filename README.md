@@ -1,4 +1,4 @@
 # ImageSearch
 search image by image
 
-安装 pip install -r requirement.txt
+安装: pip install -r requirement.txt
